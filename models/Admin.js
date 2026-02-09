@@ -56,6 +56,7 @@ const adminSchema = new mongoose.Schema(
         "Manager",
         "CEO",
         "Driver",
+        "Deliver Person",
         "Security Guard",
         "Accountant",
       ],

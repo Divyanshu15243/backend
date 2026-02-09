@@ -236,18 +236,17 @@ const updateStaff = async (req, res) => {
   }
 };
 
-const deleteStaff = (req, res) => {
-  Admin.deleteOne({ _id: req.params.id }, (err) => {
-    if (err) {
-      res.status(500).send({
-        message: err.message,
-      });
-    } else {
-      res.status(200).send({
-        message: "Admin Deleted Successfully!",
-      });
-    }
-  });
+const deleteStaff = async (req, res) => {
+  try {
+    await Admin.deleteOne({ _id: req.params.id });
+    res.status(200).send({
+      message: "Admin Deleted Successfully!",
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
 };
 
 const updatedStatus = async (req, res) => {

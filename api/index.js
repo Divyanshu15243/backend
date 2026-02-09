@@ -9,6 +9,7 @@ const path = require("path");
 const { connectDB } = require("../config/db");
 const productRoutes = require("../routes/productRoutes");
 const customerRoutes = require("../routes/customerRoutes");
+const { addShippingAddress } = require("../controller/customerController");
 const adminRoutes = require("../routes/adminRoutes");
 const orderRoutes = require("../routes/orderRoutes");
 const customerOrderRoutes = require("../routes/customerOrderRoutes");
@@ -19,6 +20,7 @@ const settingRoutes = require("../routes/settingRoutes");
 const currencyRoutes = require("../routes/currencyRoutes");
 const languageRoutes = require("../routes/languageRoutes");
 const notificationRoutes = require("../routes/notificationRoutes");
+const walletRoutes = require("../routes/walletRoutes");
 const { isAuth, isAdmin } = require("../config/auth");
 // const {
 //   getGlobalSetting,
@@ -35,29 +37,42 @@ app.set("trust proxy", 1);
 
 app.use(express.json({ limit: "4mb" }));
 app.use(helmet());
-app.options("*", cors()); // include before other routes
-app.use(cors());
+
+// CORS Configuration
+const corsOptions = {
+  origin: "*",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 //root route
 app.get("/", (req, res) => {
   res.send("App works properly!");
 });
 
+app.post("/api/customer/shipping/address/:id", addShippingAddress);
+
 //this for route will need for store front, also for admin dashboard
-app.use("/api/products/", productRoutes);
-app.use("/api/category/", categoryRoutes);
-app.use("/api/coupon/", couponRoutes);
-app.use("/api/customer/", customerRoutes);
-app.use("/api/order/", isAuth, customerOrderRoutes);
-app.use("/api/attributes/", attributeRoutes);
-app.use("/api/setting/", settingRoutes);
-app.use("/api/currency/", isAuth, currencyRoutes);
-app.use("/api/language/", languageRoutes);
-app.use("/api/notification/", isAuth, notificationRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/category", categoryRoutes);
+app.use("/api/coupon", couponRoutes);
+app.use("/api/order", isAuth, customerOrderRoutes);
+app.use("/api/attributes", attributeRoutes);
+app.use("/api/setting", settingRoutes);
+app.use("/api/currency", isAuth, currencyRoutes);
+app.use("/api/language", languageRoutes);
+app.use("/api/notification", isAuth, notificationRoutes);
+app.use("/api/customer/wallet", walletRoutes);
+app.use("/api/customer", customerRoutes);
 
 //if you not use admin dashboard then these two route will not needed.
-app.use("/api/admin/", adminRoutes);
-app.use("/api/orders/", orderRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Use express's default error handling middleware
 app.use((err, req, res, next) => {

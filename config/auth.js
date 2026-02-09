@@ -27,6 +27,7 @@ const tokenForVerify = (user) => {
       name: user.name,
       email: user.email,
       password: user.password,
+      referralCode: user.referralCode,
     },
     process.env.JWT_SECRET_FOR_VERIFY,
     { expiresIn: "15m" }

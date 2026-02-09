@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const AutoIncrement = require("mongoose-sequence")(mongoose);
 
 const orderSchema = new mongoose.Schema(
   {
@@ -61,6 +60,18 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    totalProfit: {
+      type: Number,
+      default: 0,
+    },
+    referralCommission: {
+      type: Number,
+      default: 0,
+    },
+    referrer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+    },
     shippingOption: {
       type: String,
       required: false,
@@ -83,11 +94,12 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-const Order = mongoose.model(
-  "Order",
-  orderSchema.plugin(AutoIncrement, {
-    inc_field: "invoice",
-    start_seq: 10000,
-  })
-);
+orderSchema.pre('save', async function() {
+  if (!this.invoice) {
+    const lastOrder = await this.constructor.findOne({}, {}, { sort: { 'invoice': -1 } });
+    this.invoice = lastOrder ? lastOrder.invoice + 1 : 10000;
+  }
+});
+
+const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;

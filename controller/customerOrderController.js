@@ -12,16 +12,27 @@ const { sendEmail } = require("../lib/email-sender/sender");
 const { formatAmountForStripe } = require("../lib/stripe/stripe");
 const { handleCreateInvoice } = require("../lib/email-sender/create");
 const { handleProductQuantity } = require("../lib/stock-controller/others");
+const { processReferralCommission } = require("../lib/referral/commissionHelper");
 const customerInvoiceEmailBody = require("../lib/email-sender/templates/order-to-customer");
 
 const addOrder = async (req, res) => {
-  // console.log("addOrder", req.body);
   try {
     const newOrder = new Order({
       ...req.body,
       user: req.user._id,
     });
     const order = await newOrder.save();
+    
+    // Process referral commission
+    const commissionResult = await processReferralCommission(order, req.user._id);
+    if (commissionResult) {
+      await Order.findByIdAndUpdate(order._id, {
+        totalProfit: commissionResult.totalProfit,
+        referralCommission: commissionResult.referralCommission,
+        referrer: commissionResult.referrerId,
+      });
+    }
+    
     res.status(201).send(order);
     handleProductQuantity(order.cart);
   } catch (err) {
@@ -124,6 +135,17 @@ const addRazorpayOrder = async (req, res) => {
       user: req.user._id,
     });
     const order = await newOrder.save();
+    
+    // Process referral commission
+    const commissionResult = await processReferralCommission(order, req.user._id);
+    if (commissionResult) {
+      await Order.findByIdAndUpdate(order._id, {
+        totalProfit: commissionResult.totalProfit,
+        referralCommission: commissionResult.referralCommission,
+        referrer: commissionResult.referrerId,
+      });
+    }
+    
     res.status(201).send(order);
     handleProductQuantity(order.cart);
   } catch (err) {
