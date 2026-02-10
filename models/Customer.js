@@ -99,6 +99,15 @@ const customerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // 🏦 Bank details
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifscCode: String,
+      bankName: String,
+      branchName: String,
+    },
   },
   {
     timestamps: true,

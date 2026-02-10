@@ -509,56 +509,30 @@ const deleteShippingAddress = async (req, res) => {
 
 const updateCustomer = async (req, res) => {
   try {
-    // Validate the input
-    const { name, email, address, phone, image } = req.body;
-
-    // Find the customer by ID
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
-      return res.status(404).send({
-        message: "Customer not found!",
-      });
+      return res.status(404).send({ message: "Customer not found!" });
     }
 
-    // Check if the email already exists and does not belong to the current customer
-    const existingCustomer = await Customer.findOne({ email });
-    if (
-      existingCustomer &&
-      existingCustomer._id.toString() !== customer._id.toString()
-    ) {
-      return res.status(400).send({
-        message: "Email already exists.",
-      });
+    // Update only provided fields
+    if (req.body.name) customer.name = req.body.name;
+    if (req.body.email) {
+      const existingCustomer = await Customer.findOne({ email: req.body.email });
+      if (existingCustomer && existingCustomer._id.toString() !== customer._id.toString()) {
+        return res.status(400).send({ message: "Email already exists." });
+      }
+      customer.email = req.body.email;
     }
+    if (req.body.address !== undefined) customer.address = req.body.address;
+    if (req.body.phone !== undefined) customer.phone = req.body.phone;
+    if (req.body.image !== undefined) customer.image = req.body.image;
+    if (req.body.walletBalance !== undefined) customer.walletBalance = req.body.walletBalance;
+    if (req.body.bankDetails !== undefined) customer.bankDetails = req.body.bankDetails;
 
-    // Update customer details
-    customer.name = name;
-    customer.email = email;
-    customer.address = address;
-    customer.phone = phone;
-    customer.image = image;
-
-    // Save the updated customer
-    const updatedUser = await customer.save();
-
-    // Generate a new token
-    const token = signInToken(updatedUser);
-
-    // Send the updated customer data with the new token
-    res.send({
-      token,
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      address: updatedUser.address,
-      phone: updatedUser.phone,
-      image: updatedUser.image,
-      message: "Customer updated successfully!",
-    });
+    await customer.save();
+    res.send({ message: "Customer updated successfully!", customer });
   } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+    res.status(500).send({ message: err.message });
   }
 };
 

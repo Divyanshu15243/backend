@@ -33,6 +33,25 @@ router.post("/verify-email", emailVerificationLimit, verifyEmailAddress);
 //validate referral code
 router.post("/validate-referral", validateReferral);
 
+//send payment notification
+router.post("/payment-notification/:id", async (req, res) => {
+  try {
+    const customer = await require("../models/Customer").findById(req.params.id);
+    if (!customer) return res.status(404).send({ message: "Customer not found" });
+    
+    const { sendEmail } = require("../lib/email-sender/sender");
+    const body = {
+      from: process.env.EMAIL_USER,
+      to: customer.email,
+      subject: "Payment Notification - Kachabazar",
+      html: `<p>Dear ${customer.name},</p><p>Your referral commission amount of ₹${req.body.amount} has been credited to your account within 2 days.</p><p>Thank you for being a valued customer!</p>`,
+    };
+    sendEmail(body, res, "Payment notification sent successfully");
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
 //verify phone number
 router.post("/verify-phone", phoneVerificationLimit, verifyPhoneNumber);
 

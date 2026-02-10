@@ -149,43 +149,26 @@ const getOrderById = async (req, res) => {
   }
 };
 
-const updateOrder = (req, res) => {
-  const newStatus = req.body.status;
-  Order.updateOne(
-    {
-      _id: req.params.id,
-    },
-    {
-      $set: {
-        status: newStatus,
-      },
-    },
-    (err) => {
-      if (err) {
-        res.status(500).send({
-          message: err.message,
-        });
-      } else {
-        res.status(200).send({
-          message: "Order Updated Successfully!",
-        });
-      }
-    }
-  );
+const updateOrder = async (req, res) => {
+  try {
+    const newStatus = req.body.status;
+    await Order.updateOne(
+      { _id: req.params.id },
+      { $set: { status: newStatus } }
+    );
+    res.status(200).send({ message: "Order Updated Successfully!" });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
 };
 
-const deleteOrder = (req, res) => {
-  Order.deleteOne({ _id: req.params.id }, (err) => {
-    if (err) {
-      res.status(500).send({
-        message: err.message,
-      });
-    } else {
-      res.status(200).send({
-        message: "Order Deleted Successfully!",
-      });
-    }
-  });
+const deleteOrder = async (req, res) => {
+  try {
+    await Order.deleteOne({ _id: req.params.id });
+    res.status(200).send({ message: "Order Deleted Successfully!" });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
 };
 
 // get dashboard recent order
@@ -345,6 +328,8 @@ const getDashboardAmount = async (req, res) => {
           updatedAt: 1,
           createdAt: 1,
           status: 1,
+          ownerProfit: 1,
+          referralCommission: 1,
         },
       },
       {
@@ -373,6 +358,12 @@ const getDashboardAmount = async (req, res) => {
 
           discount: {
             $sum: "$discount",
+          },
+          ownerProfit: {
+            $sum: "$ownerProfit",
+          },
+          referralCommission: {
+            $sum: "$referralCommission",
           },
         },
       },
@@ -458,6 +449,8 @@ const getDashboardAmount = async (req, res) => {
           : parseFloat(totalAmount[0].tAmount).toFixed(2),
       thisMonthlyOrderAmount: thisMonthOrderAmount[0]?.total,
       lastMonthOrderAmount: lastMonthOrderAmount[0]?.total,
+      thisMonthOwnerProfit: thisMonthOrderAmount[0]?.ownerProfit || 0,
+      thisMonthReferralCommission: thisMonthOrderAmount[0]?.referralCommission || 0,
       ordersData: orderFilteringData,
     });
   } catch (err) {
