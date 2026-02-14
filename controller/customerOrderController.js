@@ -29,6 +29,7 @@ const addOrder = async (req, res) => {
       await Order.findByIdAndUpdate(order._id, {
         totalProfit: commissionResult.totalProfit,
         referralCommission: commissionResult.referralCommission,
+        ownerProfit: commissionResult.ownerProfit,
         referrer: commissionResult.referrerId,
       });
     }
@@ -142,6 +143,7 @@ const addRazorpayOrder = async (req, res) => {
       await Order.findByIdAndUpdate(order._id, {
         totalProfit: commissionResult.totalProfit,
         referralCommission: commissionResult.referralCommission,
+        ownerProfit: commissionResult.ownerProfit,
         referrer: commissionResult.referrerId,
       });
     }
@@ -158,7 +160,6 @@ const addRazorpayOrder = async (req, res) => {
 // get all orders user
 const getOrderCustomer = async (req, res) => {
   try {
-    // console.log("getOrderCustomer");
     const { page, limit } = req.query;
 
     const pages = Number(page) || 1;
@@ -167,12 +168,27 @@ const getOrderCustomer = async (req, res) => {
 
     const totalDoc = await Order.countDocuments({ user: req.user._id });
 
+    // Calculate total referral earnings
+    const referralEarnings = await Order.aggregate([
+      {
+        $match: {
+          referrer: new mongoose.Types.ObjectId(req.user._id),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: { $ifNull: ["$referralCommission", 0] } },
+        },
+      },
+    ]);
+
     // total padding order count
     const totalPendingOrder = await Order.aggregate([
       {
         $match: {
           status: "Pending",
-          user: mongoose.Types.ObjectId(req.user._id),
+          user: new mongoose.Types.ObjectId(req.user._id),
         },
       },
       {
@@ -191,7 +207,7 @@ const getOrderCustomer = async (req, res) => {
       {
         $match: {
           status: "Processing",
-          user: mongoose.Types.ObjectId(req.user._id),
+          user: new mongoose.Types.ObjectId(req.user._id),
         },
       },
       {
@@ -209,7 +225,7 @@ const getOrderCustomer = async (req, res) => {
       {
         $match: {
           status: "Delivered",
-          user: mongoose.Types.ObjectId(req.user._id),
+          user: new mongoose.Types.ObjectId(req.user._id),
         },
       },
       {
@@ -240,8 +256,8 @@ const getOrderCustomer = async (req, res) => {
         totalProcessingOrder.length === 0 ? 0 : totalProcessingOrder[0].count,
       delivered:
         totalDeliveredOrder.length === 0 ? 0 : totalDeliveredOrder[0].count,
-
       totalDoc,
+      referralEarnings: referralEarnings.length === 0 ? 0 : referralEarnings[0].totalEarnings,
     });
   } catch (err) {
     res.status(500).send({
@@ -320,10 +336,37 @@ const sendEmailInvoiceToCustomer = async (req, res) => {
   }
 };
 
+const getReferralEarnings = async (req, res) => {
+  try {
+    // Get all orders where current user is the referrer
+    const orders = await Order.find({
+      referrer: req.user._id,
+    })
+      .select("_id invoice user_info cart total referralCommission createdAt")
+      .sort({ createdAt: -1 });
+
+    // Calculate total earnings
+    const totalEarnings = orders.reduce(
+      (sum, order) => sum + (order.referralCommission || 0),
+      0
+    );
+
+    res.send({
+      orders,
+      totalEarnings,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
 module.exports = {
   addOrder,
   getOrderById,
   getOrderCustomer,
+  getReferralEarnings,
   createPaymentIntent,
   createOrderByRazorPay,
   addRazorpayOrder,

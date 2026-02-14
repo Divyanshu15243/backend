@@ -36,9 +36,18 @@ const tokenForVerify = (user) => {
 
 const isAuth = async (req, res, next) => {
   const { authorization } = req.headers;
-  // console.log("authorization", req.headers);
   try {
+    if (!authorization) {
+      return res.status(401).send({
+        message: "No authorization header provided",
+      });
+    }
     const token = authorization.split(" ")[1];
+    if (!token) {
+      return res.status(401).send({
+        message: "No token provided",
+      });
+    }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();

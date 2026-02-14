@@ -68,6 +68,10 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    ownerProfit: {
+      type: Number,
+      default: 0,
+    },
     referrer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",

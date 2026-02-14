@@ -4,6 +4,7 @@ const {
   addOrder,
   getOrderById,
   getOrderCustomer,
+  getReferralEarnings,
   createPaymentIntent,
   addRazorpayOrder,
   createOrderByRazorPay,
@@ -23,6 +24,9 @@ router.post("/add/razorpay", addRazorpayOrder);
 
 //add a order by razorpay
 router.post("/create/razorpay", createOrderByRazorPay);
+
+//get referral earnings
+router.get("/referral-earnings", getReferralEarnings);
 
 //get a order by id
 router.get("/:id", getOrderById);
