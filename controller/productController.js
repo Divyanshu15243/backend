@@ -7,7 +7,6 @@ const addProduct = async (req, res) => {
   try {
     const newProduct = new Product({
       ...req.body,
-      // productId: cname + (count + 1),
       productId: req.body.productId
         ? req.body.productId
         : new mongoose.Types.ObjectId().toString(),
@@ -126,7 +125,6 @@ const getAllProducts = async (req, res) => {
 };
 
 const getProductBySlug = async (req, res) => {
-  // console.log("slug", req.params.slug);
   try {
     const product = await Product.findOne({ slug: req.params.slug });
     res.send(product);
@@ -152,11 +150,8 @@ const getProductById = async (req, res) => {
 };
 
 const updateProduct = async (req, res) => {
-  // console.log('update product')
-  // console.log('variant',req.body.variants)
   try {
     const product = await Product.findById(req.params.id);
-    // console.log("product", product);
 
     if (product) {
       product.title = { ...product.title, ...req.body.title };
@@ -188,7 +183,6 @@ const updateProduct = async (req, res) => {
     }
   } catch (err) {
     res.status(404).send(err.message);
-    // console.log('err',err)
   }
 };
 
