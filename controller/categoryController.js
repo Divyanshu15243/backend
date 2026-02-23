@@ -27,8 +27,6 @@ const addAllCategory = async (req, res) => {
       message: "Category Added Successfully!",
     });
   } catch (err) {
-    console.log(err.message);
-
     res.status(500).send({
       message: err.message,
     });
@@ -181,7 +179,6 @@ const updateStatus = async (req, res) => {
 //single category delete
 const deleteCategory = async (req, res) => {
   try {
-    console.log("id cat >>", req.params.id);
     await Category.deleteOne({ _id: req.params.id });
     await Category.deleteMany({ parentId: req.params.id });
     res.status(200).send({

@@ -553,18 +553,17 @@ const updateCustomer = async (req, res) => {
   }
 };
 
-const deleteCustomer = (req, res) => {
-  Customer.deleteOne({ _id: req.params.id }, (err) => {
-    if (err) {
-      res.status(500).send({
-        message: err.message,
-      });
-    } else {
-      res.status(200).send({
-        message: "User Deleted Successfully!",
-      });
-    }
-  });
+const deleteCustomer = async (req, res) => {
+  try {
+    await Customer.deleteOne({ _id: req.params.id });
+    res.status(200).send({
+      message: "User Deleted Successfully!",
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
 };
 
 const validateReferral = async (req, res) => {
