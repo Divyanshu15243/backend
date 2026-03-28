@@ -5,7 +5,7 @@ const orderSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
-      required: true,
+      required: false,
     },
     invoice: {
       type: Number,
@@ -90,7 +90,15 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Processing", "Delivered", "Cancel"],
+      default: "Pending",
+    },
+    orderSource: {
+      type: String,
+      default: "Online",
+    },
+    createdBy: {
+      type: String,
+      required: false,
     },
   },
   {
@@ -99,9 +107,14 @@ const orderSchema = new mongoose.Schema(
 );
 
 orderSchema.pre('save', async function() {
-  if (!this.invoice) {
-    const lastOrder = await this.constructor.findOne({}, {}, { sort: { 'invoice': -1 } });
-    this.invoice = lastOrder ? lastOrder.invoice + 1 : 10000;
+  try {
+    if (!this.invoice) {
+      const lastOrder = await this.constructor.findOne({}, {}, { sort: { 'invoice': -1 } });
+      this.invoice = lastOrder && lastOrder.invoice ? lastOrder.invoice + 1 : 10000;
+    }
+  } catch (err) {
+    console.error("Invoice pre-save error:", err.message);
+    this.invoice = Date.now();
   }
 });
 

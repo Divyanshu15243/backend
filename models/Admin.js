@@ -64,6 +64,12 @@ const adminSchema = new mongoose.Schema(
     access_list: {
       type: Array,
       required: false,
+      default: [
+        "dashboard", "products", "categories", "attributes", "coupons",
+        "customers", "customer-profit", "orders", "our-staff", "settings",
+        "languages", "currencies", "store", "customization", "store-settings",
+        "product", "order", "edit-profile", "customer-order", "notifications", "pos"
+      ],
     },
     joiningData: {
       type: Date,

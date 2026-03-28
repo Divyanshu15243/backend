@@ -38,6 +38,7 @@ const getAllOrders = async (req, res) => {
       { status: { $regex: `Processing`, $options: "i" } },
       { status: { $regex: `Delivered`, $options: "i" } },
       { status: { $regex: `Cancel`, $options: "i" } },
+      { status: { $regex: `POS-Completed`, $options: "i" } },
     ];
   }
 
@@ -654,6 +655,28 @@ const getDashboardOrders = async (req, res) => {
   }
 };
 
+const addPosOrder = async (req, res) => {
+  try {
+    const newOrder = new Order({
+      cart: req.body.cart || [],
+      subTotal: Number(req.body.subTotal) || 0,
+      shippingCost: Number(req.body.shippingCost) || 0,
+      discount: Number(req.body.discount) || 0,
+      total: Number(req.body.total) || 0,
+      paymentMethod: req.body.paymentMethod || "Cash",
+      user_info: req.body.user_info || {},
+      status: "POS-Completed",
+      orderSource: "POS",
+      createdBy: typeof req.body.createdBy === 'object' ? (req.body.createdBy?.en || JSON.stringify(req.body.createdBy)) : (req.body.createdBy || "Admin"),
+    });
+
+    const order = await newOrder.save();
+    res.status(201).send(order);
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -665,4 +688,5 @@ module.exports = {
   getDashboardRecentOrder,
   getDashboardCount,
   getDashboardAmount,
+  addPosOrder,
 };

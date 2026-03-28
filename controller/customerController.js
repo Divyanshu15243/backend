@@ -90,7 +90,6 @@ const verifyPhoneNumber = async (req, res) => {
     const message = "Please check your phone for the verification code!";
     return res.send({ message });
   } catch (err) {
-    console.error("Error during phone verification:", err);
     res.status(500).send({
       message: err.message,
     });
@@ -170,7 +169,6 @@ const registerCustomer = async (req, res) => {
       );
     }
   } catch (error) {
-    console.error("Error during email verification:", error);
     res.status(500).send({
       message: "Internal server error. Please try again later.",
     });

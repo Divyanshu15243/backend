@@ -11,10 +11,14 @@ const {
   getBestSellerProductChart,
   getDashboardCount,
   getDashboardAmount,
+  addPosOrder,
 } = require("../controller/orderController");
 
 //get all orders
 router.get("/", getAllOrders);
+
+// add POS order (admin)
+router.post("/pos/add", addPosOrder);
 
 // get dashboard orders data
 router.get("/dashboard", getDashboardOrders);
