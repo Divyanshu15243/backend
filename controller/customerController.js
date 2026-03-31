@@ -389,9 +389,20 @@ const signUpWithOauthProvider = async (req, res) => {
 const getAllCustomers = async (req, res) => {
   try {
     const Order = require("../models/Order");
-    const users = await Customer.find({}).sort({ _id: -1 });
-    
-    // Calculate owner profit for each customer from their orders
+    const searchText = req.query.searchText || "";
+
+    const filter = searchText
+      ? {
+          $or: [
+            { name: { $regex: searchText, $options: "i" } },
+            { email: { $regex: searchText, $options: "i" } },
+            { phone: { $regex: searchText, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const users = await Customer.find(filter).sort({ _id: -1 });
+
     const usersWithOwnerProfit = await Promise.all(
       users.map(async (user) => {
         const orders = await Order.find({ user: user._id });
@@ -405,7 +416,7 @@ const getAllCustomers = async (req, res) => {
         };
       })
     );
-    
+
     res.send(usersWithOwnerProfit);
   } catch (err) {
     res.status(500).send({ message: err.message });
