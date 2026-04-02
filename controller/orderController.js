@@ -1,4 +1,6 @@
 const Order = require("../models/Order");
+const Customer = require("../models/Customer");
+const { processReferralCommission } = require("../lib/referral/commissionHelper");
 
 const getAllOrders = async (req, res) => {
   const {
@@ -657,6 +659,22 @@ const getDashboardOrders = async (req, res) => {
 
 const addPosOrder = async (req, res) => {
   try {
+    // find customer by customerId (preferred) or email
+    let customer = null;
+
+    console.log(`POS Order - customerId: ${req.body.customerId}, email: ${req.body.user_info?.email}`);
+
+    if (req.body.customerId) {
+      customer = await Customer.findById(req.body.customerId);
+      console.log(`Customer found by ID: ${customer?.name}, referredBy: ${customer?.referredBy}`);
+    } else if (
+      req.body.user_info?.email &&
+      req.body.user_info.email !== "pos@n23gujaratibasket.com"
+    ) {
+      customer = await Customer.findOne({ email: req.body.user_info.email });
+      console.log(`Customer found by email: ${customer?.name}`);
+    }
+
     const newOrder = new Order({
       cart: req.body.cart || [],
       subTotal: Number(req.body.subTotal) || 0,
@@ -667,10 +685,38 @@ const addPosOrder = async (req, res) => {
       user_info: req.body.user_info || {},
       status: "POS-Completed",
       orderSource: "POS",
-      createdBy: typeof req.body.createdBy === 'object' ? (req.body.createdBy?.en || JSON.stringify(req.body.createdBy)) : (req.body.createdBy || "Admin"),
+      createdBy:
+        typeof req.body.createdBy === "object"
+          ? req.body.createdBy?.en || JSON.stringify(req.body.createdBy)
+          : req.body.createdBy || "Admin",
+      ...(customer && { user: customer._id }),
     });
 
     const order = await newOrder.save();
+
+    // process referral commission if customer exists and has a referrer
+    if (customer) {
+      const commissionResult = await processReferralCommission(
+        order,
+        customer._id
+      );
+      if (commissionResult) {
+        await Order.findByIdAndUpdate(order._id, {
+          totalProfit: commissionResult.totalProfit,
+          referralCommission: commissionResult.referralCommission,
+          ownerProfit: commissionResult.ownerProfit,
+          referrer: commissionResult.referrerId,
+        });
+
+        // log referral commission credited
+        if (commissionResult.referralCommission > 0) {
+          console.log(
+            `Referral commission of ${commissionResult.referralCommission} credited to referrer of ${customer.name}`
+          );
+        }
+      }
+    }
+
     res.status(201).send(order);
   } catch (err) {
     res.status(500).send({ message: err.message });

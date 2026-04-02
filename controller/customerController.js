@@ -599,6 +599,34 @@ const validateReferral = async (req, res) => {
   }
 };
 
+const setReferredBy = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { referrerId } = req.body;
+
+    if (!referrerId) {
+      return res.status(400).send({ message: "Referrer ID is required!" });
+    }
+
+    // make sure referrer exists
+    const referrer = await Customer.findById(referrerId);
+    if (!referrer) {
+      return res.status(404).send({ message: "Referrer not found!" });
+    }
+
+    // prevent self-referral
+    if (customerId === referrerId) {
+      return res.status(400).send({ message: "Customer cannot refer themselves!" });
+    }
+
+    await Customer.findByIdAndUpdate(customerId, { referredBy: referrerId });
+
+    res.send({ message: `Referrer set to ${referrer.name} successfully!` });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+};
+
 module.exports = {
   loginCustomer,
   verifyPhoneNumber,

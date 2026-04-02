@@ -20,6 +20,7 @@ const {
   updateShippingAddress,
   deleteShippingAddress,
   validateReferral,
+  setReferredBy,
 } = require("../controller/customerController");
 const {
   passwordVerificationLimit,
