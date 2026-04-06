@@ -151,6 +151,21 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
+    // If only stock or variants sent (e.g. from StockManagement), use targeted update
+    const isPartialUpdate = Object.keys(req.body).every((k) =>
+      ["stock", "variants"].includes(k)
+    );
+
+    if (isPartialUpdate) {
+      const updated = await Product.findByIdAndUpdate(
+        req.params.id,
+        { $set: req.body },
+        { new: true }
+      );
+      if (!updated) return res.status(404).send({ message: "Product Not Found!" });
+      return res.send({ data: updated, message: "Product updated successfully!" });
+    }
+
     const product = await Product.findById(req.params.id);
 
     if (product) {
