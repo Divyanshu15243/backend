@@ -21,12 +21,29 @@ const {
   deleteShippingAddress,
   validateReferral,
   setReferredBy,
+  otpLogin,
 } = require("../controller/customerController");
 const {
   passwordVerificationLimit,
   emailVerificationLimit,
   phoneVerificationLimit,
 } = require("../lib/email-sender/sender");
+
+// check if phone or email already registered
+router.post("/check-exists", async (req, res) => {
+  try {
+    const { phone, email } = req.body;
+    const Customer = require("../models/Customer");
+    const phoneExists = phone ? await Customer.findOne({ phone }) : null;
+    const emailExists = email ? await Customer.findOne({ email }) : null;
+    res.send({
+      phoneExists: !!phoneExists,
+      emailExists: !!emailExists,
+    });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
 
 //verify email
 router.post("/verify-email", emailVerificationLimit, verifyEmailAddress);
@@ -73,6 +90,9 @@ router.post("/register/:token", registerCustomer);
 
 //login a user
 router.post("/login", loginCustomer);
+
+// otp login/signup
+router.post("/otp-login", otpLogin);
 
 //register or login with google and fb
 router.post("/signup/oauth", signUpWithOauthProvider);

@@ -575,6 +575,62 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+const otpLogin = async (req, res) => {
+  try {
+    const { phone, name, email, referralCode } = req.body;
+    if (!phone) return res.status(400).send({ message: "Phone is required" });
+
+    let customer = await Customer.findOne({ phone });
+
+    if (!customer) {
+      // new user — require name & email
+      if (!name || !email)
+        return res.status(404).send({ message: "User not found. Please sign up." });
+
+      // check if email already taken by another account
+      const emailExists = await Customer.findOne({ email });
+      if (emailExists)
+        return res.status(400).send({ message: "This email is already registered. Please use a different email or login with email/password." });
+
+      const newReferralCode = await generateUniqueReferralCode();
+      let referrerId = null;
+      if (referralCode) {
+        const referrer = await validateReferralCode(referralCode);
+        if (referrer) referrerId = referrer._id;
+      }
+
+      customer = new Customer({
+        name,
+        email,
+        phone,
+        referralCode: newReferralCode,
+        referredBy: referrerId,
+      });
+      await customer.save();
+    } else {
+      // existing user — update phone if not set, update name if provided
+      let changed = false;
+      if (name && !customer.name) { customer.name = name; changed = true; }
+      if (email && !customer.email) { customer.email = email; changed = true; }
+      if (changed) await customer.save();
+    }
+
+    const token = signInToken(customer);
+    res.send({
+      token,
+      _id: customer._id,
+      name: customer.name,
+      email: customer.email || "",
+      phone: customer.phone,
+      image: customer.image,
+      referralCode: customer.referralCode,
+      walletBalance: customer.walletBalance || 0,
+    });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+};
+
 const validateReferral = async (req, res) => {
   try {
     const { code } = req.body;
@@ -647,4 +703,5 @@ module.exports = {
   updateShippingAddress,
   deleteShippingAddress,
   validateReferral,
+  otpLogin,
 };

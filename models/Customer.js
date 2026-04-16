@@ -68,13 +68,15 @@ const customerSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
+      sparse: true,
       lowercase: true,
     },
     phone: {
       type: String,
       required: false,
+      sparse: true,
     },
     password: {
       type: String,
