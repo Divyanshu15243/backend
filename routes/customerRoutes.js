@@ -70,6 +70,38 @@ router.post("/payment-notification/:id", async (req, res) => {
   }
 });
 
+// send NEFT payment notification
+router.post("/neft-notification/:id", async (req, res) => {
+  try {
+    const Customer = require("../models/Customer");
+    const { sendEmail } = require("../lib/email-sender/sender");
+    const neftPaymentEmailBody = require("../lib/email-sender/templates/neft-payment");
+
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).send({ message: "Customer not found" });
+    if (!customer.email) return res.status(400).send({ message: "Customer has no email address" });
+
+    const { amount, neftNumber } = req.body;
+    if (!neftNumber) return res.status(400).send({ message: "NEFT number is required" });
+
+    const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+    const body = {
+      from: process.env.EMAIL_USER,
+      to: customer.email,
+      subject: `Payment of ₹${parseFloat(amount).toFixed(2)} Credited - N23 Gujarati Basket`,
+      html: neftPaymentEmailBody({ name: customer.name, amount, neftNumber, date }),
+    };
+
+    // reset wallet after payment
+    await Customer.findByIdAndUpdate(req.params.id, { walletBalance: 0 });
+
+    sendEmail(body, res, "NEFT notification sent and wallet reset successfully");
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
 //verify phone number
 router.post("/verify-phone", phoneVerificationLimit, verifyPhoneNumber);
 
