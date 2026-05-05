@@ -2,7 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const path = require("path");
 // const http = require("http");
 // const { Server } = require("socket.io");
 
@@ -39,12 +38,27 @@ app.use(express.json({ limit: "4mb" }));
 app.use(helmet());
 
 // CORS Configuration
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:4100",
+  "https://admin.n23gujaratibasket.com",
+  "https://www.n23gujaratibasket.com",
+  "https://n23gujaratibasket.com",
+];
+
 const corsOptions = {
-  origin: "*",
+  origin: (origin, callback) => {
+    // allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
@@ -78,14 +92,6 @@ app.use("/api/orders", orderRoutes);
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   res.status(400).json({ message: err.message });
-});
-
-// Serve static files from the "dist" directory
-app.use("/static", express.static("public"));
-
-// Serve the index.html file for all routes
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
 const PORT = process.env.PORT || 5000;
