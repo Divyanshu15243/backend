@@ -337,12 +337,12 @@ const getDashboardAmount = async (req, res) => {
       },
       {
         $match: {
-          $or: [{ status: { $regex: "Delivered", $options: "i" } }],
+          $or: [
+            { status: { $regex: "Delivered", $options: "i" } },
+            { status: { $regex: "POS-Completed", $options: "i" } },
+          ],
           year: { $eq: new Date().getFullYear() },
           month: { $eq: new Date().getMonth() + 1 },
-          // $expr: {
-          //   $eq: [{ $month: "$updatedAt" }, { $month: new Date() }],
-          // },
         },
       },
       {
@@ -466,40 +466,43 @@ const getDashboardAmount = async (req, res) => {
 
 const getBestSellerProductChart = async (req, res) => {
   try {
-    // console.log("getBestSellerProductChart");
-
     const totalDoc = await Order.countDocuments({});
     const bestSellingProduct = await Order.aggregate([
+      { $unwind: "$cart" },
       {
-        $unwind: "$cart",
+        $addFields: {
+          cleanTitle: {
+            $trim: {
+              input: {
+                $arrayElemAt: [
+                  { $split: [
+                    { $cond: [
+                      { $eq: [{ $type: "$cart.title" }, "string"] },
+                      "$cart.title",
+                      { $ifNull: ["$cart.title.en", "Unknown"] }
+                    ]},
+                    "("
+                  ]},
+                  0
+                ]
+              }
+            }
+          }
+        }
       },
       {
         $group: {
-          _id: "$cart.title",
-
-          count: {
-            $sum: "$cart.quantity",
-          },
+          _id: "$cleanTitle",
+          count: { $sum: "$cart.quantity" },
         },
       },
-      {
-        $sort: {
-          count: -1,
-        },
-      },
-      {
-        $limit: 4,
-      },
+      { $sort: { count: -1 } },
+      { $limit: 4 },
     ]);
 
-    res.send({
-      totalDoc,
-      bestSellingProduct,
-    });
+    res.send({ totalDoc, bestSellingProduct });
   } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+    res.status(500).send({ message: err.message });
   }
 };
 
@@ -662,17 +665,13 @@ const addPosOrder = async (req, res) => {
     // find customer by customerId (preferred) or email
     let customer = null;
 
-    console.log(`POS Order - customerId: ${req.body.customerId}, email: ${req.body.user_info?.email}`);
-
     if (req.body.customerId) {
       customer = await Customer.findById(req.body.customerId);
-      console.log(`Customer found by ID: ${customer?.name}, referredBy: ${customer?.referredBy}`);
     } else if (
       req.body.user_info?.email &&
       req.body.user_info.email !== "pos@n23gujaratibasket.com"
     ) {
       customer = await Customer.findOne({ email: req.body.user_info.email });
-      console.log(`Customer found by email: ${customer?.name}`);
     }
 
     const newOrder = new Order({
@@ -710,9 +709,7 @@ const addPosOrder = async (req, res) => {
 
         // log referral commission credited
         if (commissionResult.referralCommission > 0) {
-          console.log(
-            `Referral commission of ${commissionResult.referralCommission} credited to referrer of ${customer.name}`
-          );
+          // commission credited
         }
       }
     }

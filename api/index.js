@@ -28,6 +28,7 @@ const { isAuth, isAdmin } = require("../config/auth");
 
 const app = express();
 
+// Vercel serverless: connect DB per-request (reuses connection if already open)
 let isConnected = false;
 const connect = async () => {
   if (isConnected) return;
@@ -35,14 +36,16 @@ const connect = async () => {
   isConnected = true;
 };
 
-app.use(async (req, res, next) => {
-  try {
-    await connect();
-    next();
-  } catch (err) {
-    res.status(500).json({ error: "Database connection failed" });
-  }
-});
+if (require.main !== module) {
+  app.use(async (req, res, next) => {
+    try {
+      await connect();
+      next();
+    } catch (err) {
+      res.status(500).json({ error: "Database connection failed" });
+    }
+  });
+}
 
 // We are using this for the express-rate-limit middleware
 // See: https://github.com/nfriedly/express-rate-limit
@@ -96,7 +99,16 @@ app.use((err, req, res, next) => {
 
 app.use("/static", express.static("public"));
 
-module.exports = app;
+// Local dev: start server. Vercel: export app as serverless handler.
+if (require.main === module) {
+  connectDB().then(() => {
+    const PORT = process.env.PORT || 5055;
+    app.listen(PORT, () => console.log(`server running on port ${PORT}`));
+  });
+} else {
+  // Vercel serverless — DB handled per-request via middleware above
+  module.exports = app;
+}
 
 // set up socket
 // const io = new Server(server, {
