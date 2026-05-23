@@ -1,6 +1,6 @@
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
-const { processReferralCommission } = require("../lib/referral/commissionHelper");
+const { calculateOrderProfit } = require("../lib/referral/commissionHelper");
 
 const getAllOrders = async (req, res) => {
   const {
@@ -290,177 +290,84 @@ const getDashboardCount = async (req, res) => {
 };
 
 const getDashboardAmount = async (req, res) => {
-  // console.log('total')
-  let week = new Date();
-  week.setDate(week.getDate() - 10);
+  const now = new Date();
 
-  // console.log('getDashboardAmount');
+  // today: midnight to now
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
 
-  const currentDate = new Date();
-  currentDate.setDate(1); // Set the date to the first day of the current month
-  currentDate.setHours(0, 0, 0, 0); // Set the time to midnight
+  // yesterday: midnight to midnight
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const yesterdayEnd = new Date(todayStart);
 
-  const lastMonthStartDate = new Date(currentDate); // Copy the current date
-  lastMonthStartDate.setMonth(currentDate.getMonth() - 1); // Subtract one month
+  // this month start
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  let lastMonthEndDate = new Date(currentDate); // Copy the current date
-  lastMonthEndDate.setDate(0); // Set the date to the last day of the previous month
-  lastMonthEndDate.setHours(23, 59, 59, 999); // Set the time to the end of the day
+  // last month range
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  // chart: last 30 days
+  const last30 = new Date(now);
+  last30.setDate(last30.getDate() - 30);
+
+  const completedStatuses = [
+    { status: { $regex: "Delivered", $options: "i" } },
+    { status: { $regex: "POS-Completed", $options: "i" } },
+  ];
 
   try {
-    // total order amount
-    const totalAmount = await Order.aggregate([
-      {
-        $group: {
-          _id: null,
-          tAmount: {
-            $sum: "$total",
-          },
-        },
-      },
-    ]);
-    // console.log('totalAmount',totalAmount)
-    const thisMonthOrderAmount = await Order.aggregate([
-      {
-        $project: {
-          year: { $year: "$updatedAt" },
-          month: { $month: "$updatedAt" },
-          total: 1,
-          subTotal: 1,
-          discount: 1,
-          updatedAt: 1,
-          createdAt: 1,
-          status: 1,
-          ownerProfit: 1,
-          referralCommission: 1,
-        },
-      },
-      {
-        $match: {
-          $or: [
-            { status: { $regex: "Delivered", $options: "i" } },
-            { status: { $regex: "POS-Completed", $options: "i" } },
-          ],
-          year: { $eq: new Date().getFullYear() },
-          month: { $eq: new Date().getMonth() + 1 },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            month: {
-              $month: "$updatedAt",
-            },
-          },
-          total: {
-            $sum: "$total",
-          },
-          subTotal: {
-            $sum: "$subTotal",
-          },
+    const [totalAmountRes, thisMonthRes, lastMonthRes, todayOrders, yesterdayOrders, chartOrders] =
+      await Promise.all([
+        // all-time total
+        Order.aggregate([{ $group: { _id: null, tAmount: { $sum: "$total" } } }]),
 
-          discount: {
-            $sum: "$discount",
-          },
-          ownerProfit: {
-            $sum: "$ownerProfit",
-          },
-          referralCommission: {
-            $sum: "$referralCommission",
-          },
-        },
-      },
-      {
-        $sort: { _id: -1 },
-      },
-      {
-        $limit: 1,
-      },
-    ]);
+        // this month completed
+        Order.aggregate([
+          { $match: { $or: completedStatuses, updatedAt: { $gte: thisMonthStart } } },
+          { $group: { _id: null, total: { $sum: "$total" }, ownerProfit: { $sum: "$ownerProfit" }, referralCommission: { $sum: "$referralCommission" } } },
+        ]),
 
-    const lastMonthOrderAmount = await Order.aggregate([
-      {
-        $project: {
-          year: { $year: "$updatedAt" },
-          month: { $month: "$updatedAt" },
-          total: 1,
-          subTotal: 1,
-          discount: 1,
-          updatedAt: 1,
-          createdAt: 1,
-          status: 1,
-        },
-      },
-      {
-        $match: {
-          $or: [{ status: { $regex: "Delivered", $options: "i" } }],
+        // last month completed
+        Order.aggregate([
+          { $match: { $or: completedStatuses, updatedAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+          { $group: { _id: null, total: { $sum: "$total" } } },
+        ]),
 
-          updatedAt: { $gt: lastMonthStartDate, $lt: lastMonthEndDate },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            month: {
-              $month: "$updatedAt",
-            },
-          },
-          total: {
-            $sum: "$total",
-          },
-          subTotal: {
-            $sum: "$subTotal",
-          },
+        // today all orders (any status) for payment breakdown
+        Order.find(
+          { updatedAt: { $gte: todayStart } },
+          { paymentMethod: 1, total: 1, updatedAt: 1, createdAt: 1, ownerProfit: 1 }
+        ),
 
-          discount: {
-            $sum: "$discount",
-          },
-        },
-      },
-      {
-        $sort: { _id: -1 },
-      },
-      {
-        $limit: 1,
-      },
-    ]);
+        // yesterday all orders
+        Order.find(
+          { updatedAt: { $gte: yesterdayStart, $lt: yesterdayEnd } },
+          { paymentMethod: 1, total: 1, updatedAt: 1, createdAt: 1 }
+        ),
 
-    // console.log("thisMonthlyOrderAmount ===>", thisMonthlyOrderAmount);
+        // last 30 days for chart (completed only)
+        Order.find(
+          { $or: completedStatuses, updatedAt: { $gte: last30 } },
+          { paymentMethod: 1, total: 1, updatedAt: 1, createdAt: 1 }
+        ),
+      ]);
 
-    // order list last 10 days
-    const orderFilteringData = await Order.find(
-      {
-        $or: [{ status: { $regex: `Delivered`, $options: "i" } }],
-        updatedAt: {
-          $gte: week,
-        },
-      },
-
-      {
-        paymentMethod: 1,
-        paymentDetails: 1,
-        total: 1,
-        createdAt: 1,
-        updatedAt: 1,
-      }
-    );
+    const todayOwnerProfit = todayOrders.reduce((s, o) => s + (o.ownerProfit || 0), 0);
 
     res.send({
-      totalAmount:
-        totalAmount.length === 0
-          ? 0
-          : parseFloat(totalAmount[0].tAmount).toFixed(2),
-      thisMonthlyOrderAmount: thisMonthOrderAmount[0]?.total,
-      lastMonthOrderAmount: lastMonthOrderAmount[0]?.total,
-      thisMonthOwnerProfit: thisMonthOrderAmount[0]?.ownerProfit || 0,
-      thisMonthReferralCommission: thisMonthOrderAmount[0]?.referralCommission || 0,
-      ordersData: orderFilteringData,
+      totalAmount: totalAmountRes[0] ? parseFloat(totalAmountRes[0].tAmount).toFixed(2) : 0,
+      thisMonthlyOrderAmount: thisMonthRes[0]?.total || 0,
+      lastMonthOrderAmount: lastMonthRes[0]?.total || 0,
+      thisMonthOwnerProfit: thisMonthRes[0]?.ownerProfit || 0,
+      thisMonthReferralCommission: thisMonthRes[0]?.referralCommission || 0,
+      todayOwnerProfit: parseFloat(todayOwnerProfit.toFixed(2)),
+      // ordersData contains today + yesterday + chart data
+      ordersData: [...todayOrders, ...yesterdayOrders, ...chartOrders],
     });
   } catch (err) {
-    // console.log('err',err)
-    res.status(500).send({
-      message: err.message,
-    });
+    res.status(500).send({ message: err.message });
   }
 };
 
@@ -662,9 +569,8 @@ const getDashboardOrders = async (req, res) => {
 
 const addPosOrder = async (req, res) => {
   try {
-    // find customer by customerId (preferred) or email
+    // resolve registered customer (by id or email, skip walk-in email)
     let customer = null;
-
     if (req.body.customerId) {
       customer = await Customer.findById(req.body.customerId);
     } else if (
@@ -693,26 +599,49 @@ const addPosOrder = async (req, res) => {
 
     const order = await newOrder.save();
 
-    // process referral commission if customer exists and has a referrer
-    if (customer) {
-      const commissionResult = await processReferralCommission(
-        order,
-        customer._id
-      );
-      if (commissionResult) {
-        await Order.findByIdAndUpdate(order._id, {
-          totalProfit: commissionResult.totalProfit,
-          referralCommission: commissionResult.referralCommission,
-          ownerProfit: commissionResult.ownerProfit,
-          referrer: commissionResult.referrerId,
-        });
+    // calculate profit and split
+    const totalProfit = await calculateOrderProfit(order.cart);
+    const tp = parseFloat(totalProfit.toFixed(2));
 
-        // log referral commission credited
-        if (commissionResult.referralCommission > 0) {
-          // commission credited
-        }
-      }
+    let profitUpdate;
+
+    if (customer && customer.referredBy) {
+      // registered customer WITH referrer — 60/40 split
+      const referralCommission = parseFloat((tp * 0.4).toFixed(2));
+      const ownerProfit = parseFloat((tp * 0.6).toFixed(2));
+
+      // credit referrer wallet
+      await Customer.findByIdAndUpdate(
+        customer.referredBy,
+        { $inc: { walletBalance: referralCommission } }
+      );
+
+      const Transaction = require("../models/Transaction");
+      await new Transaction({
+        user: customer.referredBy,
+        type: "referral_commission",
+        amount: referralCommission,
+        order: order._id,
+        description: `Referral commission from POS order #${order.invoice} by ${customer.name}`,
+        status: "completed",
+      }).save();
+
+      profitUpdate = {
+        totalProfit: tp,
+        ownerProfit,
+        referralCommission,
+        referrer: customer.referredBy,
+      };
+    } else {
+      // walk-in OR registered customer with NO referrer — owner gets 100%
+      profitUpdate = {
+        totalProfit: tp,
+        ownerProfit: tp,
+        referralCommission: 0,
+      };
     }
+
+    await Order.findByIdAndUpdate(order._id, { $set: profitUpdate });
 
     res.status(201).send(order);
   } catch (err) {

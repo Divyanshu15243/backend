@@ -26,12 +26,12 @@ const addOrder = async (req, res) => {
     // Process referral commission
     const commissionResult = await processReferralCommission(order, req.user._id);
     if (commissionResult) {
-      await Order.findByIdAndUpdate(order._id, {
+      await Order.findByIdAndUpdate(order._id, { $set: {
         totalProfit: commissionResult.totalProfit,
         referralCommission: commissionResult.referralCommission,
         ownerProfit: commissionResult.ownerProfit,
         referrer: commissionResult.referrerId,
-      });
+      }});
     }
     
     res.status(201).send(order);
@@ -140,12 +140,12 @@ const addRazorpayOrder = async (req, res) => {
     // Process referral commission
     const commissionResult = await processReferralCommission(order, req.user._id);
     if (commissionResult) {
-      await Order.findByIdAndUpdate(order._id, {
+      await Order.findByIdAndUpdate(order._id, { $set: {
         totalProfit: commissionResult.totalProfit,
         referralCommission: commissionResult.referralCommission,
         ownerProfit: commissionResult.ownerProfit,
         referrer: commissionResult.referrerId,
-      });
+      }});
     }
     
     res.status(201).send(order);

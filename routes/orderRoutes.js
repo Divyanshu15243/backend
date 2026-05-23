@@ -29,20 +29,29 @@ router.get("/monthly-report", async (req, res) => {
       createdAt: { $gte: start, $lt: end },
     }).sort({ createdAt: 1 });
 
+    // per-order: totalProfit = ownerProfit + referralCommission
+    // for orders with no referrer: ownerProfit = totalProfit, referralCommission = 0
+    const totalSales        = orders.reduce((s, o) => s + (o.total || 0), 0);
+    const totalDiscount     = orders.reduce((s, o) => s + (o.discount || 0), 0);
+    const totalShipping     = orders.reduce((s, o) => s + (o.shippingCost || 0), 0);
+    const ownerProfit       = orders.reduce((s, o) => s + (o.ownerProfit || 0), 0);
+    const referralCommission = orders.reduce((s, o) => s + (o.referralCommission || 0), 0);
+    const totalProfit       = orders.reduce((s, o) => s + (o.totalProfit || 0), 0);
+
     const summary = {
       totalOrders: orders.length,
-      totalSales: orders.reduce((s, o) => s + (o.total || 0), 0),
-      totalDiscount: orders.reduce((s, o) => s + (o.discount || 0), 0),
-      totalShipping: orders.reduce((s, o) => s + (o.shippingCost || 0), 0),
-      ownerProfit: orders.reduce((s, o) => s + (o.ownerProfit || 0), 0),
-      referralCommission: orders.reduce((s, o) => s + (o.referralCommission || 0), 0),
-      // Total Profit = Total Sales collected - Referral Commission paid out
-      totalProfit: orders.reduce((s, o) => s + (o.total || 0), 0) - orders.reduce((s, o) => s + (o.referralCommission || 0), 0),
-      cashOrders: orders.filter(o => o.paymentMethod === "Cash").length,
-      onlineOrders: orders.filter(o => o.paymentMethod !== "Cash" && o.orderSource !== "POS").length,
+      totalSales,
+      totalDiscount,
+      totalShipping,
+      totalProfit,
+      ownerProfit,
+      referralCommission,
+      cashOrders:     orders.filter(o => /cash/i.test(o.paymentMethod)).length,
+      onlineOrders:   orders.filter(o => o.orderSource !== "POS" && !/cash/i.test(o.paymentMethod)).length,
+      posOrders:      orders.filter(o => o.orderSource === "POS").length,
       deliveredOrders: orders.filter(o => /delivered/i.test(o.status)).length,
-      pendingOrders: orders.filter(o => /pending/i.test(o.status)).length,
-      posOrders: orders.filter(o => o.orderSource === "POS").length,
+      pendingOrders:  orders.filter(o => /pending/i.test(o.status)).length,
+      cancelOrders:   orders.filter(o => /cancel/i.test(o.status)).length,
     };
 
     res.send({ orders, summary, month: m, year: y });
