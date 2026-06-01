@@ -335,15 +335,15 @@ const getDashboardAmount = async (req, res) => {
           { $group: { _id: null, total: { $sum: "$total" } } },
         ]),
 
-        // today all orders (any status) for payment breakdown
+        // today completed orders only
         Order.find(
-          { updatedAt: { $gte: todayStart } },
+          { $or: completedStatuses, updatedAt: { $gte: todayStart } },
           { paymentMethod: 1, total: 1, updatedAt: 1, createdAt: 1, ownerProfit: 1 }
         ),
 
-        // yesterday all orders
+        // yesterday completed orders only
         Order.find(
-          { updatedAt: { $gte: yesterdayStart, $lt: yesterdayEnd } },
+          { $or: completedStatuses, updatedAt: { $gte: yesterdayStart, $lt: yesterdayEnd } },
           { paymentMethod: 1, total: 1, updatedAt: 1, createdAt: 1 }
         ),
 
@@ -363,8 +363,9 @@ const getDashboardAmount = async (req, res) => {
       thisMonthOwnerProfit: thisMonthRes[0]?.ownerProfit || 0,
       thisMonthReferralCommission: thisMonthRes[0]?.referralCommission || 0,
       todayOwnerProfit: parseFloat(todayOwnerProfit.toFixed(2)),
-      // ordersData contains today + yesterday + chart data
-      ordersData: [...todayOrders, ...yesterdayOrders, ...chartOrders],
+      todayOrders,
+      yesterdayOrders,
+      chartOrders,
     });
   } catch (err) {
     res.status(500).send({ message: err.message });
