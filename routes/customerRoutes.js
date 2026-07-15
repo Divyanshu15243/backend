@@ -74,6 +74,7 @@ router.post("/payment-notification/:id", async (req, res) => {
 router.post("/neft-notification/:id", async (req, res) => {
   try {
     const Customer = require("../models/Customer");
+    const Transaction = require("../models/Transaction");
     const { sendEmail } = require("../lib/email-sender/sender");
     const neftPaymentEmailBody = require("../lib/email-sender/templates/neft-payment");
 
@@ -92,6 +93,16 @@ router.post("/neft-notification/:id", async (req, res) => {
       subject: `Payment of ₹${parseFloat(amount).toFixed(2)} Credited - N23 Gujarati Basket`,
       html: neftPaymentEmailBody({ name: customer.name, amount, neftNumber, date }),
     };
+
+    // record payout transaction with NEFT / Txn number before resetting wallet
+    await new Transaction({
+      user: customer._id,
+      type: "withdrawal",
+      amount: parseFloat(amount),
+      transactionNumber: neftNumber,
+      description: `Referral earnings paid via NEFT`,
+      status: "completed",
+    }).save();
 
     // reset wallet after payment
     await Customer.findByIdAndUpdate(req.params.id, { walletBalance: 0 });
