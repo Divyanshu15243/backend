@@ -28,6 +28,7 @@ const {
   emailVerificationLimit,
   phoneVerificationLimit,
 } = require("../lib/email-sender/sender");
+const { isAuth, isAdmin, isSelfOrAdmin } = require("../config/auth");
 
 // check if phone or email already registered
 router.post("/check-exists", async (req, res) => {
@@ -52,7 +53,7 @@ router.post("/verify-email", emailVerificationLimit, verifyEmailAddress);
 router.post("/validate-referral", validateReferral);
 
 //send payment notification
-router.post("/payment-notification/:id", async (req, res) => {
+router.post("/payment-notification/:id", isAuth, isAdmin, async (req, res) => {
   try {
     const customer = await require("../models/Customer").findById(req.params.id);
     if (!customer) return res.status(404).send({ message: "Customer not found" });
@@ -71,7 +72,7 @@ router.post("/payment-notification/:id", async (req, res) => {
 });
 
 // send NEFT payment notification
-router.post("/neft-notification/:id", async (req, res) => {
+router.post("/neft-notification/:id", isAuth, isAdmin, async (req, res) => {
   try {
     const Customer = require("../models/Customer");
     const Transaction = require("../models/Transaction");
@@ -153,18 +154,18 @@ router.put("/reset-password", resetPassword);
 router.post("/change-password", changePassword);
 
 //add all users
-router.post("/add/all", addAllCustomers);
+router.post("/add/all", isAuth, isAdmin, addAllCustomers);
 
 //get all user
-router.get("/", getAllCustomers);
+router.get("/", isAuth, isAdmin, getAllCustomers);
 
 //get a user
-router.get("/:id", getCustomerById);
+router.get("/:id", isAuth, isSelfOrAdmin, getCustomerById);
 
 //update a user
-router.put("/:id", updateCustomer);
+router.put("/:id", isAuth, isSelfOrAdmin, updateCustomer);
 
 //delete a user
-router.delete("/:id", deleteCustomer);
+router.delete("/:id", isAuth, isAdmin, deleteCustomer);
 
 module.exports = router;

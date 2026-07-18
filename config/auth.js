@@ -59,12 +59,39 @@ const isAuth = async (req, res, next) => {
 };
 
 const isAdmin = async (req, res, next) => {
-  const admin = await Admin.findOne({ role: "Admin" });
-  if (admin) {
-    next();
-  } else {
-    res.status(401).send({
-      message: "User is not Admin",
+  try {
+    const admin = await Admin.findById(req.user._id);
+    if (admin) {
+      req.admin = admin;
+      return next();
+    }
+    return res.status(403).send({
+      message: "Access denied, admin only!",
+    });
+  } catch (err) {
+    return res.status(403).send({
+      message: "Access denied, admin only!",
+    });
+  }
+};
+
+// allow a logged-in customer to act on their own record, or any admin
+const isSelfOrAdmin = async (req, res, next) => {
+  try {
+    if (req.user._id === req.params.id) {
+      return next();
+    }
+    const admin = await Admin.findById(req.user._id);
+    if (admin) {
+      req.admin = admin;
+      return next();
+    }
+    return res.status(403).send({
+      message: "Access denied!",
+    });
+  } catch (err) {
+    return res.status(403).send({
+      message: "Access denied!",
     });
   }
 };
@@ -95,6 +122,7 @@ const handleEncryptData = (data) => {
 module.exports = {
   isAuth,
   isAdmin,
+  isSelfOrAdmin,
   signInToken,
   tokenForVerify,
   handleEncryptData,
