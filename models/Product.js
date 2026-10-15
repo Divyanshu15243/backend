@@ -89,6 +89,9 @@ const productSchema = new mongoose.Schema(
   }
 );
 
+// speeds up category pages on the store
+productSchema.index({ status: 1, categories: 1, _id: -1 });
+
 // module.exports = productSchema;
 
 const Product = mongoose.model("Product", productSchema);

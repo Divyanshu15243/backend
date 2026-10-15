@@ -316,7 +316,8 @@ const getShowingStoreProducts = async (req, res) => {
       products = await Product.find(queryObject)
         .populate({ path: "category", select: "name _id" })
         .sort({ _id: -1 })
-        .limit(100);
+        .limit(100)
+        .lean();
     } else {
       popularProducts = await Product.find({ status: "show" })
         .populate({ path: "category", select: "name _id" })
