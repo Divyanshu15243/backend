@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 const { calculateOrderProfit } = require("../lib/referral/commissionHelper");
+const { handleProductQuantity } = require("../lib/stock-controller/others");
 
 const getAllOrders = async (req, res) => {
   const {
@@ -22,16 +23,6 @@ const getAllOrders = async (req, res) => {
   date.setDate(date.getDate() - Number(day));
   const dateTime = date.toString();
 
-  const beforeToday = new Date();
-  beforeToday.setDate(beforeToday.getDate() - 1);
-  // const before_today = beforeToday.toString();
-
-  const startDateData = new Date(startDate);
-  startDateData.setDate(startDateData.getDate());
-  const start_date = startDateData.toString();
-
-  // console.log(" start_date", start_date, endDate);
-
   const queryObject = {};
 
   if (!status) {
@@ -44,11 +35,19 @@ const getAllOrders = async (req, res) => {
     ];
   }
 
-  if (customerName) {
+  const search = String(customerName || "").trim();
+  if (search) {
+    // escape regex special chars so names like "a (b)" don't break the query
+    const safe = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     queryObject.$or = [
-      { "user_info.name": { $regex: `${customerName}`, $options: "i" } },
-      { invoice: { $regex: `${customerName}`, $options: "i" } },
+      { "user_info.name": { $regex: safe, $options: "i" } },
+      { "user_info.email": { $regex: safe, $options: "i" } },
+      { "user_info.contact": { $regex: safe, $options: "i" } },
     ];
+    // invoice is stored as a number, so match it exactly
+    if (/^\d+$/.test(search)) {
+      queryObject.$or.push({ invoice: Number(search) });
+    }
   }
 
   if (day) {
@@ -59,12 +58,18 @@ const getAllOrders = async (req, res) => {
     queryObject.status = { $regex: `${status}`, $options: "i" };
   }
 
-  if (startDate && endDate) {
-    queryObject.updatedAt = {
-      $gt: start_date,
-      $lt: endDate,
-    };
+  // date range on order date; end date is inclusive of the whole day
+  // admin sends exact ISO boundaries, a plain YYYY-MM-DD is expanded here
+  const isDateOnly = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const from = startDate && new Date(isDateOnly(startDate) ? `${startDate}T00:00:00` : startDate);
+  const to = endDate && new Date(isDateOnly(endDate) ? `${endDate}T23:59:59.999` : endDate);
+  if (from && !isNaN(from)) {
+    queryObject.createdAt = { ...(queryObject.createdAt || {}), $gte: from };
   }
+  if (to && !isNaN(to)) {
+    queryObject.createdAt = { ...(queryObject.createdAt || {}), $lte: to };
+  }
+
   if (method) {
     queryObject.paymentMethod = { $regex: `${method}`, $options: "i" };
   }
@@ -85,7 +90,7 @@ const getAllOrders = async (req, res) => {
       .limit(limits);
 
     let methodTotals = [];
-    if (startDate && endDate) {
+    if (startDate || endDate) {
       // console.log("filter method total");
       const filteredOrders = await Order.find(queryObject, {
         _id: 1,
@@ -599,6 +604,9 @@ const addPosOrder = async (req, res) => {
     });
 
     const order = await newOrder.save();
+
+    // POS orders are handed over immediately, so reduce stock now
+    await handleProductQuantity(order.cart);
 
     // calculate profit and split
     const totalProfit = await calculateOrderProfit(order.cart);
